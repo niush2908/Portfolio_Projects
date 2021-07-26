@@ -1,0 +1,132 @@
+--COVID death tables
+
+SELECT * 
+FROM `portfolioproject-314807.Portfolio.CovidDeaths`;
+
+-- select data from the table
+
+SELECT location, date, total_cases, new_cases, total_deaths, population
+FROM `portfolioproject-314807.Portfolio.CovidDeaths`
+ORDER BY 1,2;
+
+-- Total cases vs Total deaths
+-- Shows what percentage of people dies who gets infected by COVID
+
+SELECT location, date, total_cases, total_deaths, (total_deaths/total_cases)*100 AS DeathPercentage
+FROM `portfolioproject-314807.Portfolio.CovidDeaths`
+WHERE location = 'India'
+ORDER BY 1,2;
+
+--Total cases vs population
+--Shows what percentage of population gets infected by COVID 
+
+SELECT location, date, total_cases, population, (total_cases/population)*100 AS InfectionPercentage
+FROM `portfolioproject-314807.Portfolio.CovidDeaths`
+WHERE location = 'India'
+ORDER BY 1,2;
+
+--Looking at countries with highest infection rate compared to population
+
+SELECT location, population, MAX(total_cases) AS HighestInfectionCount, (MAX(total_cases)/population)*100 AS InfectionPercentage
+FROM `portfolioproject-314807.Portfolio.CovidDeaths`
+GROUP BY location, population
+ORDER BY InfectionPercentage DESC; 
+
+--Showing Countries with Highest death counts
+
+SELECT location, MAX(total_deaths) AS TotalDeathCount
+FROM `portfolioproject-314807.Portfolio.CovidDeaths`
+WHERE continent IS NOT NULL
+GROUP BY location
+ORDER BY TotalDeathCount DESC; 
+
+--Continents with highest death count per population
+
+SELECT continent, SUM(population) AS TotalPopulation, MAX(total_deaths) AS TotalDeathCount
+FROM `portfolioproject-314807.Portfolio.CovidDeaths`
+WHERE continent IS NOT NULL
+GROUP BY continent
+ORDER BY TotalDeathCount DESC;
+
+--GLOBAL NUMBER  
+--Total Death percentage 
+
+SELECT  SUM(new_cases) AS TotalCases, SUM(new_deaths) AS TotalDeaths, SUM(new_deaths)/SUM(new_cases)*100 AS DeathPercentage
+FROM `portfolioproject-314807.Portfolio.CovidDeaths`
+WHERE continent IS NOT NULL
+GROUP BY date
+ORDER BY 1,2;
+
+--Total Death Percentage datewise
+
+SELECT  date, SUM(new_cases) AS TotalCases, SUM(new_deaths) AS TotalDeaths, SUM(new_deaths)/SUM(new_cases)*100 AS DeathPercentage
+FROM `portfolioproject-314807.Portfolio.CovidDeaths`
+WHERE continent IS NOT NULL
+GROUP BY date
+ORDER BY 1,2;
+
+--COVID Vaccination table
+
+SELECT *
+FROM `portfolioproject-314807.Portfolio.CovidVaccination`;
+
+--Showing population vaccinated date by date
+
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+    SUM(vac.new_vaccinations) OVER(PARTITION BY dea.location ORDER BY dea.location, dea.date) AS RollingPeopleVaccinated,
+
+FROM `portfolioproject-314807.Portfolio.CovidDeaths` dea
+JOIN `portfolioproject-314807.Portfolio.CovidVaccination` vac
+    ON dea.location = vac.location AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL 
+ORDER BY 2,3
+
+--Total Population vs Population Vaccinated
+
+WITH PopvsVac AS 
+(
+    SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+    SUM(vac.new_vaccinations) OVER(PARTITION BY dea.location ORDER BY dea.location, dea.date) AS RollingPeopleVaccinated,
+    FROM `portfolioproject-314807.Portfolio.CovidDeaths` dea
+    JOIN `portfolioproject-314807.Portfolio.CovidVaccination` vac
+    ON dea.location = vac.location AND dea.date = vac.date
+    WHERE dea.continent IS NOT NULL 
+)
+
+SELECT *,(RollingPeopleVaccinated/Population)*100 
+FROM PopvsVac;
+
+--TEMP TABLE
+
+DROP TABLE Portfolio.PercentPopluationVaccinated 
+CREATE TABLE Portfolio.PercentPopluationVaccinated
+(
+    Continent string,
+    Location string,
+    Date datetime,
+    Population numeric,
+    new_vaccinations numeric,
+    RollingPeopleVaccinated numeric
+)
+
+AS
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+    SUM(vac.new_vaccinations) OVER(PARTITION BY dea.location ORDER BY dea.location, dea.date) AS RollingPeopleVaccinated,
+FROM `portfolioproject-314807.Portfolio.CovidDeaths` dea 
+JOIN `portfolioproject-314807.Portfolio.CovidVaccination` vac
+ON dea.location = vac.location AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL;
+
+
+SELECT *,(RollingPeopleVaccinated/Population)*100 
+FROM `portfolioproject-314807.Portfolio.PercentPopluationVaccinated`;
+
+--creating view to store data for later visulaization
+
+CREATE VIEW Portfolio.XYZ AS
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+    SUM(vac.new_vaccinations) OVER(PARTITION BY dea.location ORDER BY dea.location, dea.date) AS RollingPeopleVaccinated,
+FROM `portfolioproject-314807.Portfolio.CovidDeaths` dea 
+JOIN `portfolioproject-314807.Portfolio.CovidVaccination` vac
+ON dea.location = vac.location AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL;
